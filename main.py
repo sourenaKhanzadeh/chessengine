@@ -2,10 +2,12 @@ import pygame
 from pygame.locals import *
 from pygame.color import Color
 from itertools import product
+import numpy as np
 
 
 class Board:
     DIM = 8
+    moveLog = []
 
     def __init__(self, game):
         self.screen = game.screen
@@ -26,7 +28,9 @@ class Board:
         ]
 
         self.whiteToMove = True
-        self.moveLog = []
+
+        self.isMoving = False
+        self.movingPiece = ""
 
     def load_images(self):
         pieces = ["B", "K", "N", "p", 'Q', 'R']
@@ -53,8 +57,33 @@ class Board:
                 if piece != "--":
                     self.screen.blit(self.img[piece], pygame.rect.Rect(j * size, i * size, size, size))
 
+    def move(self):
+        size = self.game.WIDTH // self.DIM
+        mouse_pos = np.array(pygame.mouse.get_pos(), dtype=np.int32)//size
+        btn_pressed = pygame.mouse.get_pressed()[0]
+        r, c = mouse_pos
+        if btn_pressed:
+            piece = self.board[c][r]
+            pygame.mouse.set_cursor(SYSTEM_CURSOR_HAND)
+            if piece != "--" and not self.isMoving:
+                self.movingPiece = [self.img[piece], piece]
+                self.isMoving = True
+                self.board[c][r] = "--"
+                Board.moveLog.append((piece, c, r))
+
+            if self.isMoving:
+                self.screen.blit(self.movingPiece[0], pygame.Rect(r*size, c*size, size, size))
+        else:
+            pygame.mouse.set_cursor(SYSTEM_CURSOR_ARROW)
+            if self.isMoving:
+                self.board[c][r] = self.movingPiece[1]
+                Board.moveLog.append((self.movingPiece[1], c, r))
+            self.isMoving = False
+            self.movingPiece = ""
+
     def update(self):
         self.draw()
+        self.move()
 
 
 class Game:
@@ -81,6 +110,16 @@ class Game:
             for ev in pygame.event.get():
                 if ev.type == QUIT:
                     run = False
+                if ev.type == KEYDOWN:
+                    if ev.key == K_z and pygame.key.get_mods() & K_LCTRL:
+                        board = self.scene[0]
+                        if board.moveLog:
+                            piece, c, r = board.moveLog[-2]
+                            _, cN, rN = board.moveLog[-1]
+                            board.moveLog.pop()
+                            board.moveLog.pop()
+                            board.board[c][r] = piece
+                            board.board[cN][rN] = "--"
 
             self.display_update()
 
